@@ -1,0 +1,375 @@
+﻿<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+      <link rel="stylesheet" href="./js/theme/default/style.css" type="text/css" />
+
+      <script src="./js/OpenLayers.js"></script>
+    <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.min.css" />
+      <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <title>Map Viewer </title>
+    <style type="text/css">
+      body { overflow: hidden; }
+
+      .navbar-offset { margin-top: 50px; }
+      #map { position: absolute; top: 50px; bottom: 0px; left: 0px; right: 0px; }
+      #map .ol-zoom { font-size: 1.2em; }
+
+      .zoom-top-opened-sidebar { margin-top: 5px; }
+      .zoom-top-collapsed { margin-top: 45px; }
+
+      .mini-submenu{
+        display:none;  
+        background-color: rgba(255, 255, 255, 0.46);
+        border: 1px solid rgba(0, 0, 0, 0.9);
+        border-radius: 4px;
+        padding: 9px;  
+        /*position: relative;*/
+        width: 42px;
+        text-align: center;
+      }
+
+      .mini-submenu-left {
+        position: absolute;
+        top: 60px;
+        left: .5em;
+        z-index: 40;
+      }
+
+      #map { z-index: 35; }
+
+      .sidebar { z-index: 45; }
+
+      .main-row { position: relative; top: 0; }
+
+      .mini-submenu:hover{
+        cursor: pointer;
+      }
+
+      .slide-submenu{
+        background: rgba(0, 0, 0, 0.45);
+        display: inline-block;
+        padding: 0 8px;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      #slider label {
+  position: absolute;
+  width: 20px;
+  margin-top: 20px;
+  margin-left: -10px;
+  text-align: center;
+}
+
+    </style>
+     
+    <script type="text/javascript" src="//code.jquery.com/jquery-2.1.1.min.js"></script>
+    <script type="text/javascript" src="//maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+      <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <script type="text/javascript">
+        var formats
+        function updateFormats() {
+            in_options = {
+                'internalProjection': map.baseLayer.projection,
+                'externalProjection': new OpenLayers.Projection("EPSG:4326")
+            };
+            out_options = {
+                'internalProjection': map.baseLayer.projection,
+                'externalProjection': new OpenLayers.Projection("EPSG:4326")
+            };
+
+            formats = {
+                'in': { geojson: new OpenLayers.Format.GeoJSON(in_options) },
+                'out': { geojson: new OpenLayers.Format.GeoJSON(out_options) }
+            };
+        }
+
+      function init(){
+          
+          var context = {
+              getColour: function (feature) {
+
+                  var value = feature.id;
+                  if (value > 0 && value <= 2) {
+                      return "#ccccff"
+                  }
+                  else if (value > 2 && value <= 5) {
+                      return "#b2b2ff"
+                  }
+                  else if (value > 5 && value <= 10) {
+                      return "#9999ff"
+                  }
+
+                  else
+                      return "#00004c"
+
+
+              }
+          };
+
+          var template = {
+              fillOpacity: 0.9,
+              strokeColor: "#555555",
+              strokeWidth: 1,
+              fillColor: "${getColour}"
+          };
+
+          var style = new OpenLayers.Style(template, { context: context });
+          var styleMap = new OpenLayers.StyleMap({ 'default': style });
+
+          map = new OpenLayers.Map('map');
+        
+
+        osm = new OpenLayers.Layer.OSM("Simple OSM Map");
+       
+
+        vectors = new OpenLayers.Layer.Vector("Vector Layer", { projection: map.displayProjection, styleMap: styleMap });
+        
+        map.addLayers([osm, vectors]);
+        map.setCenter(
+            new OpenLayers.LonLat(-108, 43)
+            .transform(
+                new OpenLayers.Projection("EPSG:4326"),
+                map.getProjectionObject())
+             , 7
+        );
+        
+        map.addControl(new OpenLayers.Control.MousePosition());
+        map.addControl(new OpenLayers.Control.LayerSwitcher());
+        pol = new OpenLayers.Control.DrawFeature(vectors, OpenLayers.Handler.Path)
+
+        map.addControl(pol)
+            
+        var select = new OpenLayers.Control.SelectFeature(vectors, { hover: true, onSelect: serialize });
+        map.addControl(select);
+        select.activate();
+        updateFormats();
+        //$("#ouput").dialog();
+
+          // Attach a submit handler to the form
+        $("#inputform").submit(function (event) {
+
+            // Stop form from submitting normally
+            
+            
+            
+            var $form = $(this),
+             geojson_str = document.getElementById('geojson').value,
+             simulation_time = $form.find("input[name='simulation_time']").val(),
+             simulation_steps = $form.find("input[name='simulation_steps']").val(),
+             url = $form.attr("action");
+
+            $.ajax({
+                type: 'POST', // define the type of HTTP verb we want to use (POST for our form)
+                url: url, // the url where we want to POST
+                data: { geojson: geojson_str, simulation_time:simulation_time, simulation_steps:simulation_steps  }, // our data object
+               // dataType: 'json', // what type of data do we expect back from the server
+                // encode: true
+                async:false,
+                success: function (e0) {
+                    python_result = e0;
+                    //deserialize(e0)
+                    fetchgeojson(0,0);
+                    
+                }
+            })
+            console.log([0, simulation_time * simulation_steps, simulation_time, 0])
+            createslider(0, simulation_time * simulation_steps,simulation_time, 0)
+            // stop the form from submitting the normal way and refreshing the page
+            event.preventDefault();
+        });
+       
+
+      };
+      
+      function fetchgeojson(current_step) {
+          geojson_url = "http://localhost:81/unigis/getgeojson.php";
+          geojson_id=parseInt($("#simulation_time").val());
+
+          $.ajax({
+              type: 'GET', // define the type of HTTP verb we want to use (POST for our form)
+              url: geojson_url, // the url where we want to POST
+              data: { geojson_id:current_step/geojson_id }, // our data object
+              // dataType: 'json', // what type of data do we expect back from the server
+              // encode: true
+              async: false,
+              success: function (geoj) {
+                  current_geoj = geoj;
+                  deserialize(geoj, current_step);
+                  //fetchgeojson(0);
+
+              }
+          })
+
+      }
+        slider1=0
+      function createslider(min, max, step, current) {
+          if (slider1) { $("#slider").slider('destroy'); $('#slider').empty() };
+          slider1= $("#slider").slider({
+              value: parseFloat(current),
+              min: parseFloat(min),
+              max: parseFloat(max),
+              step: parseFloat(step),
+              slide: function (event, ui) {
+                  //fetchgeojson(ui.value);
+              },
+              change: function (event, ui) {
+                  fetchgeojson(ui.value);
+                  console.log(ui.value);
+              },
+              slidestart: function (event, ui) {
+                  //fetchgeojson(ui.value);
+              },
+          });
+             
+              // Get the number of possible values
+              vals = (max - min)/step;
+               
+              // Position the labels
+              for (var i = 0; i <= vals; i++) {
+                  
+                  // Create a new element and position it with percentages
+                  var el = $('<label>' + (i + min)*step + '</label>').css('left', (i / vals * 100) + '%');
+
+                  // Add the element inside #slider
+                  $("#slider").append(el);
+
+              }
+
+          
+          
+      }
+
+
+      function serialize(feature) {
+          var type = "geojson";
+          var str = formats['out'][type].write(feature, false);
+          // not a good idea in general, just for this demo
+          str = str.replace(/,/g, ', ');
+          
+          document.getElementById('geojson').value=str
+          console.log(str)
+      }
+
+      function createpoly() {
+          //vectors.destroyFeatures();
+          document.getElementById('output').value = '';
+          pol.activate()
+      }
+      function submitpoly() {
+          pol.deactivate()
+          console.log(document.getElementById('output').value)
+      }
+      function deserialize(geojson_str,step) {
+          console.log(geojson_str);
+          var type = "geojson";
+          var features = formats['in'][type].read(geojson_str);
+          var bounds;
+          if (features) {
+              if (features.constructor != Array) {
+                  features = [features];
+              }
+              for (var i = 0; i < features.length; ++i) {
+                  if (!bounds) {
+                      bounds = features[i].geometry.getBounds();
+                  } else {
+                      bounds.extend(features[i].geometry.getBounds());
+                  }
+
+              }
+              var idx = vectors.features.length;
+              vectors.addFeatures(features);
+              vectors.features[idx].id = step;
+              map.zoomToExtent(bounds);
+
+          }
+      }
+      
+      $(function () {
+          $("#playpause").click(function () {
+              if ($("#playpause").prop("value") == "Play") {
+                  
+                  hoursInterval = setInterval(function () {
+                      if (parseInt($("#slider").slider("value")) >= parseInt($("#simulation_time").val()) * parseInt($("#simulation_steps").val())) {
+                          clearInterval(hoursInterval);
+                      }
+                      else {
+                          var ss = parseInt($("#slider").slider("value")) + parseInt($("#simulation_time").val());
+                          console.log(ss);
+                          $("#slider").slider("value", ss);
+                      }
+                  }, 1000);
+
+                  $("#playpause").prop("value", "Pause");
+              }
+              else {
+
+                  clearInterval(hoursInterval);
+                  $("#slider").slider("value", parseInt($("#slider").slider("value")));
+                  $("#playpause").prop("value", "Play");
+                 // $("#slider").slider()
+              }
+          })
+          
+          
+
+      })
+      
+    </script>
+  </head>
+  <body onload="init()">
+    <div class="container">
+      <nav class="navbar navbar-fixed-top navbar-default" role="navigation">
+        <div class="container-fluid">
+          <!-- Brand and toggle get grouped for better mobile display -->
+          <div class="navbar-header">
+            <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            </button>
+            <a class="navbar-brand" href="#">Wildfire Simulation</a>
+          </div>
+          <!-- Collect the nav links, forms, and other content for toggling -->
+          <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+           <!-- <ul class="nav navbar-nav">
+              <li class="active"><a href="#">Link</a></li>
+              <li><a href="#">Link</a></li>
+              
+            </ul>-->
+               <form action="http://localhost:81/unigis/run.php" id="inputform" method="post" class="navbar-form navbar-left">
+               <input type="button" class="form-control" placeholder="Create Polygon" onclick="createpoly()" value="Fire Start Location" />
+               Time(min):<input type="text" id="simulation_time"  name="simulation_time" placeholder="Simulation Time(mins)" value="10"/>
+               Steps:<input type="text" id="simulation_steps" name="simulation_steps" placeholder="Simulation Steps" value="5"/>
+               <input type="text" id="geojson" hidden="hidden" name="geojson" value='' />
+                  
+                  <input type="submit" class="btn btn-default" value="Submit"/>
+                   <div id="slider" class="navbar-right" style="width: 400px;   padding-left: 20px;   margin-left: 20px;"></div>
+                   
+              </form>
+              <input type="button" class="btn btn-default" value="Prev" id="prev"  />
+              <input type="button" class="btn btn-default" value="Play" id="playpause" />
+              <input type="button" class="btn btn-default" value="Next" id="next" />
+              
+            
+            </div><!-- /.navbar-collapse -->
+            </div><!-- /.container-fluid -->
+          </nav>
+        </div>
+      </nav>
+      <div class="navbar-offset"></div>
+      <div id="map">
+      </div>
+      
+      <div class="mini-submenu mini-submenu-left pull-left">
+        <i class="fa fa-list-alt"></i>
+      </div>
+    
+      <div id="output" title="Basic dialog" style="left:0"></div>
+
+  </body>
+</html>

@@ -1,0 +1,100 @@
+﻿<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Vector Formats</title>
+    <link rel="stylesheet" href="./js/theme/default/style.css" type="text/css">
+    <!--[if lte IE 6]>
+        <link rel="stylesheet" href="../theme/default/ie6-style.css" type="text/css" />
+    <![endif]-->
+    <!--<link rel="stylesheet" href="style.css" type="text/css">-->
+   
+    
+    <script src="./js/OpenLayers.js"></script>
+    <script type="text/javascript">
+        
+        function updateFormats() {
+             in_options = {
+                'internalProjection': map.baseLayer.projection,
+                'externalProjection': new OpenLayers.Projection("EPSG:4326")
+            };   
+             out_options = {
+                'internalProjection': map.baseLayer.projection,
+                'externalProjection': new OpenLayers.Projection("EPSG:4326")
+            };
+           
+            formats = {'in': {geojson: new OpenLayers.Format.GeoJSON(in_options)},
+              'out': {geojson: new OpenLayers.Format.GeoJSON(out_options)  }  };
+        }
+        function init(){
+            map = new OpenLayers.Map('map');
+           
+			 osm= new OpenLayers.Layer.OSM("ds");
+            vectors = new OpenLayers.Layer.Vector("Vector Layer");
+
+            map.addLayers([osm, vectors]);
+            map.addControl(new OpenLayers.Control.MousePosition());
+            pol = new OpenLayers.Control.DrawFeature(vectors,
+                    OpenLayers.Handler.Path);
+            map.addControl(pol);
+ 
+            var select = new OpenLayers.Control.SelectFeature(vectors, {hover: true, onSelect: serialize });
+            map.addControl(select);
+            select.activate();
+            updateFormats();
+            map.setCenter(new OpenLayers.LonLat(0, 0), 1);
+        }
+
+        function serialize(feature) {
+            var type = "geojson";
+            var str = formats['out'][type].write(feature, false);
+            // not a good idea in general, just for this demo
+            str = str.replace(/,/g, ', ');
+            document.getElementById('output').value = str;
+        }
+
+        function deserialize() {
+            var element = document.getElementById('text');
+            var type = "geojson";
+            var features = formats['in'][type].read(element.value);
+            var bounds;
+            if(features) {
+                if(features.constructor != Array) {
+                    features = [features];
+                }
+                for(var i=0; i<features.length; ++i) {
+                    if (!bounds) {
+                        bounds = features[i].geometry.getBounds();
+                    } else {
+                        bounds.extend(features[i].geometry.getBounds());
+                    }
+
+                }
+                vectors.addFeatures(features);
+                map.zoomToExtent(bounds);
+                
+            } 
+        }
+
+        
+
+    </script>
+  </head>
+  <body onload="init()">
+    <div id="leftcol">
+        
+        <div id="map" class="smallmap"></div>
+        
+            <input type="button" value="Digitize" onclick="pol.activate();" />
+            <input type="button" value="Pan" onclick="pol.deactivate();" />
+        
+
+        
+    </div>
+    <div id="info">  <textarea id="output"></textarea>
+    </div>
+
+  </body>
+</html>
